@@ -1,0 +1,16 @@
+apiVersion: v1
+appVersion: "1.0.2"
+description: Matrix media repository with multi-domain in mind. 
+name: matrix-media-repo
+version: 0.1.0
+keywords:
+  - synapse
+  - chat
+  - matrix
+home: https://github.com/matrix-org/synapse
+sources:
+  - https://github.com/turt2live/matrix-media-repo
+  - https://hub.docker.com/r/turt2live/matrix-media-repo
+maintainers:
+  - name: Gavin Mogan
+    email: helm@gavinmogan.com
