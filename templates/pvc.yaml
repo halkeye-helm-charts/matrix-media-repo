@@ -2,7 +2,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "matrix-media-repo.fullname" . }}
+  name: {{ template "matrix-media-repo.fullname" . }}
+  {{- if .Values.persistence.skipuninstall }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
   labels:
 {{ include "matrix-media-repo.labels" . | indent 4 }}
   {{- with .Values.persistence.annotations  }}
@@ -19,7 +23,3 @@ spec:
       storage: {{ .Values.persistence.size | quote }}
   storageClassName: {{ .Values.persistence.storageClassName }}
 {{- end -}}
-
-
-
-

@@ -35,13 +35,20 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "matrix-media-repo.labels" -}}
-app.kubernetes.io/name: {{ include "matrix-media-repo.name" . }}
 helm.sh/chart: {{ include "matrix-media-repo.chart" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{ include "matrix-media-repo.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
+Selector labels
+*/}}
+{{- define "matrix-media-repo.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "matrix-media-repo.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*

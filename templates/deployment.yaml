@@ -2,6 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "matrix-media-repo.fullname" . }}
+  {{- if .Values.deploymentAnnotations }}
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
   labels:
 {{ include "matrix-media-repo.labels" . | indent 4 }}
 spec:
@@ -15,8 +21,7 @@ spec:
 {{- end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "matrix-media-repo.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "matrix-media-repo.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -27,13 +32,14 @@ spec:
         prometheus.io/scrape: "true"
 {{- end }}
       labels:
-        app.kubernetes.io/name: {{ include "matrix-media-repo.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- include "matrix-media-repo.selectorLabels" . | nindent 8 }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+        {{- range $key, $value := .Values.podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
     spec:
-    {{- if .Values.dnsConfig }}
-      dnsConfig:
-        {{- toYaml .Values.dnsConfig | nindent 8 }}
-    {{- end }}
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -41,11 +47,15 @@ spec:
       serviceAccountName: {{ template "matrix-media-repo.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+    {{- if .Values.dnsConfig }}
+      dnsConfig:
+        {{- toYaml .Values.dnsConfig | nindent 8 }}
+    {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -59,13 +69,24 @@ spec:
               path: /healthz
               port: http
               scheme: HTTP
-            initialDelaySeconds: 15
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
               scheme: HTTP
-            initialDelaySeconds: 15
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+{{- if semverCompare ">=1.16-0" .Capabilities.KubeVersion.GitVersion }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+{{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -74,6 +95,17 @@ spec:
             subPath: config.yaml
           - mountPath: /var/matrix/media
             name: data
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ include "matrix-media-repo.fullname" . }}
+        - name: data
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{- else }}{{ template "matrix-media-repo.fullname" . }}{{- end }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -86,14 +118,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
-      volumes:
-        - name: config
-          secret:
-            secretName: {{ include "matrix-media-repo.fullname" . }}
-        - name: data
-          {{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "matrix-media-repo.fullname" . }}
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
